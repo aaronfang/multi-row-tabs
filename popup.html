@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  body {
+    width: 300px;
+    margin: 0;
+    font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+    font-size: 13px;
+    color: #202124;
+  }
+  .wrap {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  button {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: #1a73e8;
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #1765cc;
+  }
+  button.mini {
+    padding: 3px 8px;
+    background: #e8eaed;
+    color: #202124;
+    font-size: 12px;
+  }
+  button.mini:hover {
+    background: #dadce0;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #hotkeyInput {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid #dadce0;
+    border-radius: 6px;
+    font-size: 12px;
+    background: #f8f9fa;
+    cursor: pointer;
+  }
+  #hotkeyInput:focus {
+    outline: none;
+    border-color: #1a73e8;
+  }
+  .hint {
+    font-size: 11px;
+    color: #5f6368;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <button id="toggleBtn">切换多行标签栏</button>
+  <label><input type="checkbox" id="showUrl"> 显示链接（标签名称下方）</label>
+  <div class="row">
+    <span>快捷键</span>
+    <input id="hotkeyInput" readonly placeholder="点击后按下组合键">
+    <button id="hotkeyClear" class="mini">清除</button>
+  </div>
+  <div class="hint">
+    快捷键用于展开 / 收起标签栏，需包含 Ctrl / Alt / Shift 等修饰键；<br>
+    悬浮按钮 ≡ 可拖拽到页面任意位置，点击展开标签栏。
+  </div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>
