@@ -35,8 +35,9 @@ Chrome 扩展**无法修改浏览器原生标签栏**（标签栏属于浏览器
 
 1. 打开 `chrome://extensions/`
 2. 开启右上角「开发者模式」
-3. 点击「加载已解压的扩展程序」，选择本目录（`chrome-multirow-tabs`）
-4. 工具栏出现扩展图标即安装成功
+3. 下载 [最新压缩包](https://github.com/hezhizheng/multi-row-tabs/archive/refs/heads/master.zip) 解压
+4. 点击「加载已解压的扩展程序」，选择本目录（`multi-row-tabs`）
+5. 工具栏出现扩展图标即安装成功
 
 ## 使用方法
 
