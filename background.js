@@ -2,7 +2,9 @@ const FALLBACK_ICON =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' rx='3' fill='%239aa0a6'/></svg>";
 
 // ===== favicon 转换：background 抓取 -> data URL，避免页面 Mixed Content 警告 =====
+// 缓存结构：url -> { data, ts }；失败结果只短暂缓存，到期后允许重试，避免一次偶发失败导致图标永久变兜底
 const favCache = new Map();
+const FAIL_TTL = 4000; // 失败冷却时长（ms）
 
 function blobToDataUrl(blob) {
   return new Promise((resolve) => {
@@ -13,23 +15,64 @@ function blobToDataUrl(blob) {
   });
 }
 
-async function faviconToDataUrl(url) {
+// chrome://、about: 等内部协议图标无法在扩展环境抓取，直接使用兜底图标，不进入抓取/重试流程
+function isFetchableFavUrl(url) {
+  return /^https?:/i.test(url);
+}
+
+async function faviconToDataUrl(url, force = false) {
   if (!url) return "";
   if (url.startsWith("data:")) return url;
-  if (favCache.has(url)) return favCache.get(url);
+  if (!isFetchableFavUrl(url)) return "";
+  const hit = favCache.get(url);
+  if (hit) {
+    if (hit.data) return hit.data; // 成功结果永久缓存
+    if (!force && Date.now() - hit.ts < FAIL_TTL) return ""; // 失败冷却中，稍后重试
+    favCache.delete(url);
+  }
   let data = "";
   try {
     const resp = await fetch(url, { cache: "force-cache" });
     if (resp.ok) {
       const blob = await resp.blob();
-      if (blob.size > 0 && blob.size < 256 * 1024) data = await blobToDataUrl(blob);
+      // 过滤 200 但返回 HTML 错误页的情况；部分服务器 blob.type 为空，放行
+      const okType = !blob.type || blob.type.startsWith("image/");
+      if (okType && blob.size > 0 && blob.size < 256 * 1024) data = await blobToDataUrl(blob);
     }
   } catch (e) {
     // 抓取失败时使用兜底图标
   }
   if (favCache.size >= 500) favCache.clear();
-  favCache.set(url, data);
+  favCache.set(url, { data, ts: Date.now() });
   return data;
+}
+
+// ===== favicon 失败自愈：有图标抓取失败时延迟重试，成功后广播刷新 =====
+const favRetryTimers = new Map();
+function scheduleFavRetry(windowId) {
+  if (!windowId || favRetryTimers.has(windowId)) return;
+  favRetryTimers.set(
+    windowId,
+    setTimeout(async () => {
+      favRetryTimers.delete(windowId);
+      try {
+        const tabs = await chrome.tabs.query({ windowId });
+        let fixed = false;
+        await Promise.all(
+          tabs.map(async (t) => {
+            if (!isFetchableFavUrl(t.favIconUrl)) return; // data: / chrome:// 等无需重试
+            const hit = favCache.get(t.favIconUrl);
+            if (hit && hit.data) return; // 已有成功结果
+            const data = await faviconToDataUrl(t.favIconUrl, true); // 强制绕过失败冷却
+            if (data) fixed = true;
+          })
+        );
+        if (fixed) broadcast(windowId);
+      } catch (e) {
+        // 窗口可能已关闭
+      }
+    }, FAIL_TTL + 1000)
+  );
 }
 
 // ===== 一键切换 / 还原（并行处理，减少卡顿） =====
@@ -107,15 +150,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const windowId = sender.tab ? sender.tab.windowId : undefined;
     chrome.storage.local.get("showUrl", async (cfg) => {
       const tabs = await chrome.tabs.query(windowId ? { windowId } : { currentWindow: true });
+      let failed = false;
       const list = await Promise.all(
-        tabs.map(async (t) => ({
-          id: t.id,
-          title: t.title,
-          url: t.url,
-          active: t.active,
-          fav: (await faviconToDataUrl(t.favIconUrl)) || FALLBACK_ICON,
-        }))
+        tabs.map(async (t) => {
+          const fav = (await faviconToDataUrl(t.favIconUrl)) || FALLBACK_ICON;
+          // 仅 http(s) 图标抓取失败才需要重试；chrome:// 等内部页面无图标可抓
+          if (fav === FALLBACK_ICON && isFetchableFavUrl(t.favIconUrl)) failed = true;
+          return { id: t.id, title: t.title, url: t.url, active: t.active, fav };
+        })
       );
+      if (failed) scheduleFavRetry(windowId); // 有图标抓取失败，稍后重试并自动刷新
       sendResponse({ showUrl: !!cfg.showUrl, tabs: list });
     });
     return true; // 异步响应

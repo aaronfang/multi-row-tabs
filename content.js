@@ -177,6 +177,31 @@
     }
   }
 
+  // 常见二级后缀（国家/地区 + 用途组合），命中时一级域名取后三段
+  const SECOND_LEVEL_TLDS = new Set([
+    "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn", "ac.cn",
+    "co.uk", "org.uk", "ac.uk", "gov.uk",
+    "co.jp", "or.jp", "ne.jp", "ac.jp", "go.jp",
+    "com.hk", "org.hk", "edu.hk", "gov.hk",
+    "com.tw", "org.tw", "edu.tw", "gov.tw",
+    "com.au", "net.au", "org.au", "edu.au", "gov.au",
+    "co.kr", "or.kr", "go.kr",
+    "com.sg", "com.my", "com.br", "com.mx", "com.ar", "com.tr",
+    "com.vn", "com.ph", "com.co", "com.pe", "com.eg", "com.sa",
+    "co.in", "co.nz", "co.za", "co.id", "co.th", "co.il",
+  ]);
+
+  // 提取一级域名：www.example.com → example.com；a.b.com.cn → b.com.cn
+  function rootDomain(host) {
+    if (!host) return "";
+    const labels = host.toLowerCase().split(".");
+    if (labels.length <= 2) return host.toLowerCase();
+    if (/^\d+$/.test(labels[labels.length - 1]) || /^\[/.test(host)) return host.toLowerCase(); // IP 地址
+    const lastTwo = labels.slice(-2).join(".");
+    const keep = SECOND_LEVEL_TLDS.has(lastTwo) ? 3 : 2;
+    return labels.slice(-Math.min(keep, labels.length)).join(".");
+  }
+
   function cmpText(a, b) {
     // localeCompare 支持中文拼音排序；相等时按标签 id 稳定排序
     return a.localeCompare(b, "zh-Hans-CN") || 0;
@@ -189,10 +214,16 @@
       );
     }
     if (sortMode === "host") {
+      // 优先按一级域名排序，同一级域名内再按完整主机名、标题排序
       return [...tabs].sort((a, b) => {
         const ha = hostOf(a.url);
         const hb = hostOf(b.url);
-        return cmpText(ha, hb) || cmpText(a.title || "", b.title || "") || a.id - b.id;
+        return (
+          cmpText(rootDomain(ha), rootDomain(hb)) ||
+          cmpText(ha, hb) ||
+          cmpText(a.title || "", b.title || "") ||
+          a.id - b.id
+        );
       });
     }
     return tabs; // default：保持浏览器标签原始顺序
