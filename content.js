@@ -12,6 +12,7 @@
   let lastSig = "";
   let floatOpen = false;
   let hotkey = "Alt+Z"; // 用户自定义快捷键，默认 Alt+Z
+  let sortMode = "default"; // 排序方式：default 与浏览器一致 / title 按名称 / host 按域名
   // 悬浮按钮位置：百分比存储，窗口尺寸变化后仍能保持相对位置
   let launcherPos = null;
   let drag = null;
@@ -158,11 +159,43 @@
   function signature(tabs, showUrl) {
     return (
       (showUrl ? 1 : 0) +
+      "|" +
+      sortMode +
       "\n" +
       tabs
         .map((t) => [t.id, t.active ? 1 : 0, t.title || "", t.url || "", (t.fav || "").length].join("|"))
         .join("\n")
     );
+  }
+
+  // ===== 排序 =====
+  function hostOf(url) {
+    try {
+      return new URL(url).hostname;
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function cmpText(a, b) {
+    // localeCompare 支持中文拼音排序；相等时按标签 id 稳定排序
+    return a.localeCompare(b, "zh-Hans-CN") || 0;
+  }
+
+  function sortTabs(tabs) {
+    if (sortMode === "title") {
+      return [...tabs].sort(
+        (a, b) => cmpText(a.title || "", b.title || "") || a.id - b.id
+      );
+    }
+    if (sortMode === "host") {
+      return [...tabs].sort((a, b) => {
+        const ha = hostOf(a.url);
+        const hb = hostOf(b.url);
+        return cmpText(ha, hb) || cmpText(a.title || "", b.title || "") || a.id - b.id;
+      });
+    }
+    return tabs; // default：保持浏览器标签原始顺序
   }
 
   async function render() {
@@ -187,7 +220,7 @@
       return;
     }
     if (!resp || !resp.tabs) return;
-    const tabs = resp.tabs;
+    const tabs = sortTabs(resp.tabs);
     const showUrl = !!resp.showUrl;
 
     const sig = signature(tabs, showUrl);
@@ -199,6 +232,30 @@
     ensureLauncher();
     b.classList.toggle("mrt-open", floatOpen);
     if (launcher) launcher.style.display = floatOpen ? "none" : "";
+
+    // 排序控件：位于标签栏开头，切换后立即重绘
+    const sortSel = document.createElement("select");
+    sortSel.className = "mrt-sort";
+    sortSel.title = "标签排序方式";
+    for (const [value, label] of [
+      ["default", "默认"],
+      ["title", "按名称"],
+      ["host", "按域名"],
+    ]) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = label;
+      sortSel.appendChild(opt);
+    }
+    sortSel.value = sortMode;
+    sortSel.addEventListener("click", (ev) => ev.stopPropagation());
+    sortSel.addEventListener("change", () => {
+      sortMode = sortSel.value;
+      chrome.storage.local.set({ sortMode });
+      lastSig = ""; // 强制重绘
+      render();
+    });
+    b.appendChild(sortSel);
 
     for (const t of tabs) {
       const item = document.createElement("div");
@@ -370,7 +427,7 @@
     }
   });
 
-  // 配置变化（showUrl / 按钮位置 / 快捷键）时处理
+  // 配置变化（showUrl / 按钮位置 / 快捷键 / 排序方式）时处理
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.showUrl && enabled) render();
     if (changes.launcherPos) {
@@ -380,14 +437,22 @@
     if (changes.hotkey) {
       hotkey = changes.hotkey.newValue || "";
     }
+    if (changes.sortMode) {
+      const next = changes.sortMode.newValue || "default";
+      if (next !== sortMode) {
+        sortMode = next;
+        if (enabled) render();
+      }
+    }
   });
 
-  // 初始化：读取开关状态、按钮位置与快捷键
+  // 初始化：读取开关状态、按钮位置、快捷键与排序方式
   // hotkey 为 undefined 表示从未设置 → 使用默认 Alt+Z；为空字符串表示用户已清除 → 无快捷键
-  chrome.storage.local.get(["enabled", "launcherPos", "hotkey"], (r) => {
+  chrome.storage.local.get(["enabled", "launcherPos", "hotkey", "sortMode"], (r) => {
     enabled = !!r.enabled;
     launcherPos = r.launcherPos || null;
     hotkey = r.hotkey === undefined ? "Alt+Z" : r.hotkey || "";
+    sortMode = r.sortMode || "default";
     render();
   });
 })();

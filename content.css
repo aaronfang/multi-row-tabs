@@ -23,6 +23,29 @@
   display: flex;
 }
 
+/* 排序控件：位于标签栏开头 */
+#mrt-bar .mrt-sort {
+  flex: none;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid #c8ccd0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #202124;
+  font-size: 12px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+#mrt-bar .mrt-sort:hover {
+  border-color: #1a73e8;
+}
+
+#mrt-bar .mrt-sort:focus {
+  outline: none;
+  border-color: #1a73e8;
+}
+
 /* 单个标签 */
 #mrt-bar .mrt-tab {
   display: inline-flex;
