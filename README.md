@@ -79,3 +79,6 @@ chrome-multirow-tabs/
 | `storage` | 保存开关状态、「显示链接」配置、排序方式、悬浮按钮位置与快捷键 |
 | `scripting` | 对已打开的标签页按需注入标签栏脚本 |
 | `<all_urls>`（host） | 允许在所有页面注入标签栏、后台抓取 favicon |
+
+## License
+[MIT](./LICENSE.txt)
