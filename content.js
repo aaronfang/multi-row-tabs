@@ -288,6 +288,13 @@
     });
     b.appendChild(sortSel);
 
+    // 标签数量统计
+    const countEl = document.createElement("span");
+    countEl.className = "mrt-count";
+    countEl.textContent = tabs.length;
+    countEl.title = "当前打开的标签页数";
+    b.appendChild(countEl);
+
     for (const t of tabs) {
       const item = document.createElement("div");
       item.className = "mrt-tab" + (t.active ? " mrt-active" : "");
@@ -318,6 +325,8 @@
       close.addEventListener("click", (ev) => {
         ev.stopPropagation();
         chrome.runtime.sendMessage({ type: "mrt-close", tabId: t.id });
+        // 立即从展开的标签栏中移除该标签，无需等待 background 刷新
+        item.remove();
       });
       main.appendChild(close);
 
@@ -351,6 +360,7 @@
           ev.preventDefault();
           ev.stopPropagation();
           chrome.runtime.sendMessage({ type: "mrt-close", tabId: t.id });
+          item.remove();
         }
       });
 
@@ -439,7 +449,7 @@
             const tabId = parseInt(els[kbIndex].getAttribute("data-tab-id"), 10);
             if (!Number.isNaN(tabId)) {
               chrome.runtime.sendMessage({ type: "mrt-close", tabId });
-              // 关闭后列表重绘，焦点保持在同一位置（自动落到下一个标签，末尾则回退）
+              els[kbIndex].remove();
             }
           }
           return;

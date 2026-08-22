@@ -46,6 +46,21 @@
   border-color: #1a73e8;
 }
 
+/* 标签数量统计 */
+#mrt-bar .mrt-count {
+  flex: none;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid #c8ccd0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #5f6368;
+  font-size: 12px;
+  line-height: 24px;
+  box-sizing: border-box;
+  user-select: none;
+}
+
 /* 单个标签 */
 #mrt-bar .mrt-tab {
   display: inline-flex;

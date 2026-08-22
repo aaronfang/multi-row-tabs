@@ -6,6 +6,7 @@
 
 一个 Chrome 浏览器扩展（Manifest V3），以**多行平铺**的方式展示当前窗口的所有标签页，采用**零侵入浮动模式**：不修改页面任何样式，兼容所有网站。
 
+![](https://cdn.jsdmirror.com/gh/hezhizheng/static-image-hosting@main/image-hosting/20260823002124_PGLZRWFBYIPURPTW.png)
 ## 视频演示
 
 https://github.com/user-attachments/assets/a6736d2c-746c-4b45-bb09-1fc7d6831068
