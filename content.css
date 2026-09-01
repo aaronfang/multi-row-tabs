@@ -10,9 +10,9 @@
   align-items: center;
   gap: 4px;
   padding: 6px 8px;
-  background: #f1f3f4;
-  border-bottom: 1px solid #d0d4d9;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  background: transparent;
+  border-bottom: none;
+  box-shadow: none;
   font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
   box-sizing: border-box;
   max-height: 60vh;
@@ -44,6 +44,40 @@
 #mrt-bar .mrt-sort:focus {
   outline: none;
   border-color: #1a73e8;
+}
+
+/* 分组行：一个 group 一行，组内标签自动换行 */
+#mrt-bar .mrt-group-row {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 分组名称标签：使用分组颜色 */
+#mrt-bar .mrt-group-label {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px 0 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--mrt-group-color, #9aa0a6) 14%, transparent);
+  color: var(--mrt-group-color, #9aa0a6);
+  font-size: 12px;
+  font-weight: 600;
+  user-select: none;
+}
+
+#mrt-bar .mrt-group-label::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--mrt-group-color, #9aa0a6);
 }
 
 /* 标签数量统计 */
@@ -95,6 +129,23 @@
   background: #ffffff;
   border-color: #b0b4b9;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 分组内标签：背景跟随分组颜色，左侧色条标识（底色不透明，避免透出页面） */
+#mrt-bar .mrt-tab.mrt-grouped {
+  border-left: 3px solid var(--mrt-group-color, #9aa0a6);
+  padding-left: 5px;
+  background: color-mix(in srgb, var(--mrt-group-color, #9aa0a6) 16%, #ffffff);
+}
+
+#mrt-bar .mrt-tab.mrt-grouped:hover {
+  background: color-mix(in srgb, var(--mrt-group-color, #9aa0a6) 28%, #e3e6e9);
+}
+
+/* 分组内活动标签：白底突出 + 保留左侧分组色条 */
+#mrt-bar .mrt-tab.mrt-grouped.mrt-active {
+  background: #ffffff;
+  border-left: 3px solid var(--mrt-group-color, #9aa0a6);
 }
 
 /* 第一行：图标 + 标题 + 关闭按钮 */

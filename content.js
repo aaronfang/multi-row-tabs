@@ -6,6 +6,19 @@
   const FALLBACK_ICON =
     "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' rx='3' fill='%239aa0a6'/></svg>";
 
+  // Chrome 标签分组颜色 -> 十六进制（与浏览器分组标签显示一致）
+  const GROUP_COLORS = {
+    grey: "#9aa0a6",
+    blue: "#8ab4f8",
+    red: "#f28b82",
+    yellow: "#fdd663",
+    green: "#81c995",
+    pink: "#f8a3b8",
+    purple: "#d7aefb",
+    cyan: "#78d9ec",
+    orange: "#fcad70",
+  };
+
   let bar = null;
   let launcher = null;
   let enabled = false;
@@ -156,14 +169,19 @@
   }
 
   // 标签数据签名：无变化时跳过重绘，减少卡顿
-  function signature(tabs, showUrl) {
+  function signature(tabs, showUrl, groups) {
     return (
       (showUrl ? 1 : 0) +
       "|" +
       sortMode +
       "\n" +
       tabs
-        .map((t) => [t.id, t.active ? 1 : 0, t.title || "", t.url || "", (t.fav || "").length].join("|"))
+        .map((t) => [t.id, t.active ? 1 : 0, t.title || "", t.url || "", t.groupId || -1, (t.fav || "").length].join("|"))
+        .join("\n") +
+      "\n" +
+      Object.keys(groups)
+        .sort((a, b) => a - b)
+        .map((k) => k + "|" + (groups[k].title || "") + "|" + (groups[k].color || ""))
         .join("\n")
     );
   }
@@ -253,8 +271,9 @@
     if (!resp || !resp.tabs) return;
     const tabs = sortTabs(resp.tabs);
     const showUrl = !!resp.showUrl;
+    const groups = resp.groups || {};
 
-    const sig = signature(tabs, showUrl);
+    const sig = signature(tabs, showUrl, groups);
     if (sig === lastSig && bar && document.body.contains(bar)) return; // 无变化，跳过重绘
     lastSig = sig;
 
@@ -295,9 +314,36 @@
     countEl.title = "当前打开的标签页数";
     b.appendChild(countEl);
 
+    // 每个分组一行（含分组名称 + 颜色）；未分组的标签归入默认行
+    const rowMap = new Map(); // groupId -> 行容器
+    const getRow = (gid) => {
+      let row = rowMap.get(gid);
+      if (row) return row;
+      row = document.createElement("div");
+      row.className = "mrt-group-row";
+      if (gid !== -1) {
+        const info = groups[gid];
+        if (info) {
+          const hex = GROUP_COLORS[info.color] || GROUP_COLORS.grey;
+          row.style.setProperty("--mrt-group-color", hex);
+          const label = document.createElement("div");
+          label.className = "mrt-group-label";
+          label.textContent = info.title || "未命名分组";
+          label.title = "标签分组";
+          row.appendChild(label);
+        }
+      }
+      rowMap.set(gid, row);
+      b.appendChild(row);
+      return row;
+    };
+
     for (const t of tabs) {
+      const gid = t.groupId || -1;
+      const row = getRow(gid);
       const item = document.createElement("div");
       item.className = "mrt-tab" + (t.active ? " mrt-active" : "");
+      if (gid !== -1) item.classList.add("mrt-grouped");
       item.title = (t.title || "") + "\n" + (t.url || "");
       item.setAttribute("data-tab-id", t.id); // 键盘导航回车切换时读取
 
@@ -364,7 +410,7 @@
         }
       });
 
-      b.appendChild(item);
+      row.appendChild(item);
     }
 
     // 展开期间数据刷新重绘后，恢复键盘焦点高亮

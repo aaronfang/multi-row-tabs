@@ -134,6 +134,11 @@ chrome.tabs.onUpdated.addListener((id, info, tab) => {
   if (info.favIconUrl) faviconToDataUrl(info.favIconUrl);
 });
 
+// 标签分组变化（创建 / 改名 / 变色 / 增删 / 合并）时同步刷新
+chrome.tabGroups.onCreated.addListener((g) => broadcast(g.windowId));
+chrome.tabGroups.onUpdated.addListener((g) => broadcast(g.windowId));
+chrome.tabGroups.onRemoved.addListener((g) => broadcast(g.windowId));
+
 // ===== 响应 content script 请求 =====
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return;
@@ -149,18 +154,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "mrt-get-tabs") {
     const windowId = sender.tab ? sender.tab.windowId : undefined;
     chrome.storage.local.get("showUrl", async (cfg) => {
-      const tabs = await chrome.tabs.query(windowId ? { windowId } : { currentWindow: true });
+      const opts = windowId ? { windowId } : { currentWindow: true };
+      const [tabs, groups] = await Promise.all([
+        chrome.tabs.query(opts),
+        chrome.tabGroups.query(opts),
+      ]);
+      const groupMap = {};
+      for (const g of groups) groupMap[g.id] = { title: g.title || "", color: g.color };
       let failed = false;
       const list = await Promise.all(
         tabs.map(async (t) => {
           const fav = (await faviconToDataUrl(t.favIconUrl)) || FALLBACK_ICON;
           // 仅 http(s) 图标抓取失败才需要重试；chrome:// 等内部页面无图标可抓
           if (fav === FALLBACK_ICON && isFetchableFavUrl(t.favIconUrl)) failed = true;
-          return { id: t.id, title: t.title, url: t.url, active: t.active, fav };
+          return { id: t.id, title: t.title, url: t.url, active: t.active, fav, groupId: t.groupId || -1 };
         })
       );
       if (failed) scheduleFavRetry(windowId); // 有图标抓取失败，稍后重试并自动刷新
-      sendResponse({ showUrl: !!cfg.showUrl, tabs: list });
+      sendResponse({ showUrl: !!cfg.showUrl, tabs: list, groups: groupMap });
     });
     return true; // 异步响应
   }

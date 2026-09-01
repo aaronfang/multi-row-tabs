@@ -3,7 +3,7 @@
   "name": "Multi-Row Tabs",
   "version": "1.0.0",
   "description": "在页面顶部显示多行平铺的标签栏，点击工具栏图标一键切换/还原",
-  "permissions": ["tabs", "storage", "scripting"],
+  "permissions": ["tabs", "storage", "scripting", "tabGroups"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
