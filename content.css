@@ -10,7 +10,7 @@
   align-items: center;
   gap: 4px;
   padding: 6px 8px;
-  background: transparent;
+  background: var(--mrt-bar-bg, transparent);
   border-bottom: none;
   box-shadow: none;
   font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
@@ -56,6 +56,11 @@
   min-width: 0;
 }
 
+/* 各分组（pin / group / 其他）行之间上下增加间距，不影响首行与排序控件 */
+#mrt-bar .mrt-group-row + .mrt-group-row {
+  margin-top: 6px;
+}
+
 /* 分组名称标签：使用分组颜色 */
 #mrt-bar .mrt-group-label {
   flex: none;
@@ -78,6 +83,16 @@
   height: 10px;
   border-radius: 50%;
   background: var(--mrt-group-color, #9aa0a6);
+}
+
+/* 固定(pin)标签行：灰色系，不跟随分组颜色 */
+#mrt-bar .mrt-group-label.mrt-pin-label {
+  color: #5f6368;
+  background: rgba(95, 99, 104, 0.12);
+}
+
+#mrt-bar .mrt-group-label.mrt-pin-label::before {
+  background: #9aa0a6;
 }
 
 /* 标签数量统计 */

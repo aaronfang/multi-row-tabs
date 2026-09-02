@@ -66,12 +66,39 @@
     color: #5f6368;
     line-height: 1.5;
   }
+  input[type="color"] {
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    background: #f8f9fa;
+    cursor: pointer;
+  }
+  input[type="range"] {
+    flex: 1;
+    min-width: 50px;
+    accent-color: #1a73e8;
+  }
+  .alpha-val {
+    width: 36px;
+    text-align: right;
+    font-size: 12px;
+    color: #5f6368;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <button id="toggleBtn">切换多行标签栏</button>
   <label><input type="checkbox" id="showUrl"> 显示链接（标签名称下方）</label>
+  <label><input type="checkbox" id="showLauncher"> 显示浮动按钮（已设置快捷键可关闭）</label>
+  <div class="row">
+    <span>背景颜色</span>
+    <input type="color" id="barBgColor" value="#f1f3f4" title="多行标签栏背景颜色">
+    <input type="range" id="barBgAlpha" min="0" max="100" value="0" title="多行标签栏背景透明度">
+    <span id="barBgAlphaVal" class="alpha-val">0%</span>
+  </div>
   <div class="row">
     <span>快捷键</span>
     <input id="hotkeyInput" readonly placeholder="点击后按下组合键">
@@ -79,7 +106,8 @@
   </div>
   <div class="hint">
     快捷键用于展开 / 收起标签栏，需包含 Ctrl / Alt / Shift 等修饰键；<br>
-    悬浮按钮 ≡ 可拖拽到页面任意位置，点击展开标签栏。
+    悬浮按钮 ≡ 可拖拽到页面任意位置，点击展开标签栏。<br>
+    背景透明度 0% 为完全透明；关闭浮动按钮后仍可用快捷键展开标签栏。
   </div>
 </div>
 <script src="popup.js"></script>

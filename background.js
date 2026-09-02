@@ -167,7 +167,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const fav = (await faviconToDataUrl(t.favIconUrl)) || FALLBACK_ICON;
           // 仅 http(s) 图标抓取失败才需要重试；chrome:// 等内部页面无图标可抓
           if (fav === FALLBACK_ICON && isFetchableFavUrl(t.favIconUrl)) failed = true;
-          return { id: t.id, title: t.title, url: t.url, active: t.active, fav, groupId: t.groupId || -1 };
+          return { id: t.id, title: t.title, url: t.url, active: t.active, fav, pinned: !!t.pinned, groupId: t.groupId || -1 };
         })
       );
       if (failed) scheduleFavRetry(windowId); // 有图标抓取失败，稍后重试并自动刷新

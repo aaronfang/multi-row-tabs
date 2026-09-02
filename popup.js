@@ -1,12 +1,20 @@
 const toggleBtn = document.getElementById("toggleBtn");
 const showUrlBox = document.getElementById("showUrl");
+const showLauncherBox = document.getElementById("showLauncher");
+const barBgColorInput = document.getElementById("barBgColor");
+const barBgAlphaInput = document.getElementById("barBgAlpha");
+const barBgAlphaVal = document.getElementById("barBgAlphaVal");
 const hotkeyInput = document.getElementById("hotkeyInput");
 const hotkeyClear = document.getElementById("hotkeyClear");
 
 function refreshState() {
-  chrome.storage.local.get(["enabled", "showUrl", "hotkey"], (r) => {
+  chrome.storage.local.get(["enabled", "showUrl", "showLauncher", "barBgColor", "barBgAlpha", "hotkey"], (r) => {
     toggleBtn.textContent = r.enabled ? "隐藏多行标签栏" : "显示多行标签栏";
     showUrlBox.checked = !!r.showUrl;
+    showLauncherBox.checked = r.showLauncher !== false;
+    barBgColorInput.value = r.barBgColor || "#f1f3f4";
+    barBgAlphaInput.value = Math.round((r.barBgAlpha === undefined ? 0 : r.barBgAlpha) * 100);
+    barBgAlphaVal.textContent = barBgAlphaInput.value + "%";
     // 从未设置时显示默认快捷键 Alt+Z；用户清除后显示为空
     hotkeyInput.value = r.hotkey === undefined ? "Alt+Z" : r.hotkey || "";
   });
@@ -20,6 +28,20 @@ toggleBtn.addEventListener("click", () => {
 // 显示链接配置
 showUrlBox.addEventListener("change", () => {
   chrome.storage.local.set({ showUrl: showUrlBox.checked });
+});
+
+// 浮动按钮显示 / 隐藏
+showLauncherBox.addEventListener("change", () => {
+  chrome.storage.local.set({ showLauncher: showLauncherBox.checked });
+});
+
+// 标签栏背景颜色 / 透明度
+barBgColorInput.addEventListener("input", () => {
+  chrome.storage.local.set({ barBgColor: barBgColorInput.value });
+});
+barBgAlphaInput.addEventListener("input", () => {
+  barBgAlphaVal.textContent = barBgAlphaInput.value + "%";
+  chrome.storage.local.set({ barBgAlpha: barBgAlphaInput.value / 100 });
 });
 
 // ===== 快捷键录制 =====

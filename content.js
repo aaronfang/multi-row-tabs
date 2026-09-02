@@ -26,6 +26,8 @@
   let floatOpen = false;
   let hotkey = "Alt+Z"; // 用户自定义快捷键，默认 Alt+Z
   let sortMode = "default"; // 排序方式：default 与浏览器一致 / title 按名称 / host 按域名
+  let showLauncher = true; // 是否显示右上角悬浮按钮（设置快捷键后可隐藏）
+  let barBg = null; // 标签栏背景，rgba 字符串；null 表示透明
   // 悬浮按钮位置：百分比存储，窗口尺寸变化后仍能保持相对位置
   let launcherPos = null;
   let drag = null;
@@ -33,7 +35,7 @@
   function setFloatOpen(open) {
     floatOpen = open;
     if (bar) bar.classList.toggle("mrt-open", open);
-    if (launcher) launcher.style.display = open ? "none" : "";
+    if (launcher) launcher.style.display = open || !showLauncher ? "none" : "";
     if (open) {
       // 展开时默认聚焦当前活动标签，可用方向键导航、回车切换
       const els = tabEls();
@@ -169,14 +171,18 @@
   }
 
   // 标签数据签名：无变化时跳过重绘，减少卡顿
-  function signature(tabs, showUrl, groups) {
+  function signature(tabs, showUrl, groups, showLauncher, barBg) {
     return (
       (showUrl ? 1 : 0) +
       "|" +
       sortMode +
+      "|" +
+      (showLauncher ? 1 : 0) +
+      "|" +
+      (barBg || "") +
       "\n" +
       tabs
-        .map((t) => [t.id, t.active ? 1 : 0, t.title || "", t.url || "", t.groupId || -1, (t.fav || "").length].join("|"))
+        .map((t) => [t.id, t.active ? 1 : 0, t.title || "", t.url || "", t.pinned ? 1 : 0, t.groupId || -1, (t.fav || "").length].join("|"))
         .join("\n") +
       "\n" +
       Object.keys(groups)
@@ -225,10 +231,20 @@
     return a.localeCompare(b, "zh-Hans-CN") || 0;
   }
 
+  // 基础优先级：固定标签（pin）最前 → 分组标签其次 → 其他标签
+  function pinnedGroupRank(t) {
+    if (t.pinned) return 0;
+    if ((t.groupId || -1) !== -1) return 1;
+    return 2;
+  }
+
   function sortTabs(tabs) {
     if (sortMode === "title") {
       return [...tabs].sort(
-        (a, b) => cmpText(a.title || "", b.title || "") || a.id - b.id
+        (a, b) =>
+          pinnedGroupRank(a) - pinnedGroupRank(b) ||
+          cmpText(a.title || "", b.title || "") ||
+          a.id - b.id
       );
     }
     if (sortMode === "host") {
@@ -237,6 +253,7 @@
         const ha = hostOf(a.url);
         const hb = hostOf(b.url);
         return (
+          pinnedGroupRank(a) - pinnedGroupRank(b) ||
           cmpText(rootDomain(ha), rootDomain(hb)) ||
           cmpText(ha, hb) ||
           cmpText(a.title || "", b.title || "") ||
@@ -244,7 +261,9 @@
         );
       });
     }
-    return tabs; // default：保持浏览器标签原始顺序
+    // default：优先 pin > group > 其他，同级别内保持浏览器原始顺序
+    const order = new Map(tabs.map((t, i) => [t.id, i]));
+    return [...tabs].sort((a, b) => pinnedGroupRank(a) - pinnedGroupRank(b) || order.get(a.id) - order.get(b.id));
   }
 
   async function render() {
@@ -273,15 +292,18 @@
     const showUrl = !!resp.showUrl;
     const groups = resp.groups || {};
 
-    const sig = signature(tabs, showUrl, groups);
+    const sig = signature(tabs, showUrl, groups, showLauncher, barBg);
     if (sig === lastSig && bar && document.body.contains(bar)) return; // 无变化，跳过重绘
     lastSig = sig;
 
     const b = ensureBar();
     b.textContent = "";
-    ensureLauncher();
+    if (showLauncher) ensureLauncher();
     b.classList.toggle("mrt-open", floatOpen);
-    if (launcher) launcher.style.display = floatOpen ? "none" : "";
+    if (launcher) launcher.style.display = floatOpen || !showLauncher ? "none" : "";
+    // 标签栏背景：用户可配置颜色 + 透明度
+    if (barBg) b.style.setProperty("--mrt-bar-bg", barBg);
+    else b.style.removeProperty("--mrt-bar-bg");
 
     // 排序控件：位于标签栏开头，切换后立即重绘
     const sortSel = document.createElement("select");
@@ -314,36 +336,47 @@
     countEl.title = "当前打开的标签页数";
     b.appendChild(countEl);
 
-    // 每个分组一行（含分组名称 + 颜色）；未分组的标签归入默认行
-    const rowMap = new Map(); // groupId -> 行容器
-    const getRow = (gid) => {
-      let row = rowMap.get(gid);
+    // 分行：固定(pin)标签单独一行且最前，再按分组一行，未分组的标签归入默认行
+    const rowMap = new Map(); // key("pin" / 组id) -> 行容器
+    const getRow = (key, init) => {
+      let row = rowMap.get(key);
       if (row) return row;
       row = document.createElement("div");
       row.className = "mrt-group-row";
-      if (gid !== -1) {
-        const info = groups[gid];
-        if (info) {
-          const hex = GROUP_COLORS[info.color] || GROUP_COLORS.grey;
-          row.style.setProperty("--mrt-group-color", hex);
-          const label = document.createElement("div");
-          label.className = "mrt-group-label";
-          label.textContent = info.title || "未命名分组";
-          label.title = "标签分组";
-          row.appendChild(label);
-        }
-      }
-      rowMap.set(gid, row);
+      if (init) init(row);
+      rowMap.set(key, row);
       b.appendChild(row);
       return row;
     };
 
     for (const t of tabs) {
-      const gid = t.groupId || -1;
-      const row = getRow(gid);
+      let row;
+      if (t.pinned) {
+        // 固定标签：单独一行，始终位于最前（排序保证 pin 排最前）
+        row = getRow("pin", (r) => {
+          const label = document.createElement("div");
+          label.className = "mrt-group-label mrt-pin-label";
+          label.textContent = "固定";
+          r.appendChild(label);
+        });
+      } else {
+        const gid = t.groupId || -1;
+        row = getRow(gid, (r) => {
+          if (gid === -1) return; // 未分组行无标签
+          const info = groups[gid];
+          if (!info) return;
+          const hex = GROUP_COLORS[info.color] || GROUP_COLORS.grey;
+          r.style.setProperty("--mrt-group-color", hex);
+          const label = document.createElement("div");
+          label.className = "mrt-group-label";
+          label.textContent = info.title || "未命名分组";
+          label.title = "标签分组";
+          r.appendChild(label);
+        });
+      }
       const item = document.createElement("div");
       item.className = "mrt-tab" + (t.active ? " mrt-active" : "");
-      if (gid !== -1) item.classList.add("mrt-grouped");
+      if ((t.groupId || -1) !== -1) item.classList.add("mrt-grouped");
       item.title = (t.title || "") + "\n" + (t.url || "");
       item.setAttribute("data-tab-id", t.id); // 键盘导航回车切换时读取
 
@@ -531,15 +564,49 @@
         if (enabled) render();
       }
     }
+    if (changes.showLauncher) {
+      showLauncher = changes.showLauncher.newValue !== false;
+      if (enabled) render();
+    }
+    if (changes.barBgColor || changes.barBgAlpha) {
+      applyBarBg(changes.barBgColor && changes.barBgColor.newValue, changes.barBgAlpha && changes.barBgAlpha.newValue);
+      if (enabled) render();
+    }
   });
 
-  // 初始化：读取开关状态、按钮位置、快捷键与排序方式
+  // hex 颜色 + 透明度(0~1) → rgba 字符串
+  function hexToRgba(hex, alpha) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+  }
+
+  // 当前背景配置（applyBarBg 增量更新时维护，缺失的参数沿用当前值）
+  let currentBarBgColor = "";
+  let currentBarBgAlpha = 0;
+
+  function applyBarBg(color, alpha) {
+    if (color !== undefined) currentBarBgColor = color;
+    if (alpha !== undefined) currentBarBgAlpha = alpha;
+    if (!currentBarBgColor || currentBarBgAlpha === undefined || currentBarBgAlpha === null) {
+      barBg = null;
+      return;
+    }
+    barBg = hexToRgba(currentBarBgColor, Math.max(0, Math.min(1, currentBarBgAlpha)));
+  }
+
+  // 初始化：读取开关状态、按钮位置、快捷键、排序方式与界面配置
   // hotkey 为 undefined 表示从未设置 → 使用默认 Alt+Z；为空字符串表示用户已清除 → 无快捷键
-  chrome.storage.local.get(["enabled", "launcherPos", "hotkey", "sortMode"], (r) => {
+  chrome.storage.local.get(["enabled", "launcherPos", "hotkey", "sortMode", "showLauncher", "barBgColor", "barBgAlpha"], (r) => {
     enabled = !!r.enabled;
     launcherPos = r.launcherPos || null;
     hotkey = r.hotkey === undefined ? "Alt+Z" : r.hotkey || "";
     sortMode = r.sortMode || "default";
+    showLauncher = r.showLauncher !== false;
+    currentBarBgColor = r.barBgColor || "";
+    currentBarBgAlpha = r.barBgAlpha === undefined ? 0 : r.barBgAlpha;
+    applyBarBg(currentBarBgColor, currentBarBgAlpha);
     render();
   });
 })();
